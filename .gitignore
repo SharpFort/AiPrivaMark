@@ -1,0 +1,30 @@
+# Dependencies
+node_modules
+.pnpm-debug.log*
+
+# Build outputs
+build
+dist
+.plasmo
+
+# Environment variables
+.env
+.env*.local
+
+# IDEs and editors
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS metadata
+Thumbs.db
+Desktop.ini
+
+# Plasmo local development
+.plasmo/
