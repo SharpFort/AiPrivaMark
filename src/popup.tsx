@@ -1,14 +1,11 @@
-import "~src/styles/globals.css"
+import { CountButton } from "~features/count-button"
+
+import "~style.css"
 
 function IndexPopup() {
   return (
-    <div className="p-4 w-64">
-      <h1 className="text-xl font-bold text-blue-600">
-        AiPrivaMark
-      </h1>
-      <p className="mt-2 text-gray-600">
-        Your Private Knowledge Base.
-      </p>
+    <div className="plasmo-flex plasmo-items-center plasmo-justify-center plasmo-h-16 plasmo-w-40">
+      <CountButton />
     </div>
   )
 }

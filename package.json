@@ -1,8 +1,8 @@
 {
-  "name": "aiprivamark",
-  "displayName": "AiPrivaMark",
-  "version": "1.0.0",
-  "description": "Your Private, AI-Powered Knowledge Base.",
+  "name": "ai-priva-mark",
+  "displayName": "Ai priva mark",
+  "version": "0.0.1",
+  "description": "A privacy-first, AI-powered bookmark manager extension. Auto-summarize and tag your links using your own API keys (DeepSeek/OpenAI), with 100% local data storage. Built with Plasmo.",
   "author": "SharpFort",
   "scripts": {
     "dev": "plasmo dev",
@@ -10,26 +10,38 @@
     "package": "plasmo package"
   },
   "dependencies": {
-    "@plasmohq/storage": "^1.13.0",
-    "plasmo": "0.89.4",
-    "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "@mozilla/readability": "0.6.0",
+    "@plasmohq/storage": "1.15.0",
+    "fuse.js": "7.1.0",
+    "plasmo": "0.90.5",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "tailwindcss": "3.4.1"
   },
   "devDependencies": {
-    "@types/chrome": "0.0.301",
-    "@types/node": "22.10.6",
-    "@types/react": "19.2.3",
-    "@types/react-dom": "19.2.3",
-    "autoprefixer": "10.4.20",
-    "postcss": "8.5.1",
-    "tailwindcss": "3.4.17",
-    "typescript": "5.7.3"
+    "@ianvs/prettier-plugin-sort-imports": "4.1.1",
+    "@types/chrome": "0.0.258",
+    "@types/node": "20.11.5",
+    "@types/react": "18.2.48",
+    "@types/react-dom": "18.2.18",
+    "postcss": "8.4.33",
+    "prettier": "3.2.4",
+    "typescript": "5.3.3"
   },
   "manifest": {
+    "host_permissions": [
+      "https://*/*"
+    ],
     "permissions": [
-      "storage",
       "sidePanel",
-      "bookmarks"
-    ]
+      "storage",
+      "unlimitedStorage",
+      "bookmarks",
+      "contextMenus",
+      "notifications"
+    ],
+    "side_panel": {
+      "default_path": "sidepanel.html"
+    }
   }
 }
