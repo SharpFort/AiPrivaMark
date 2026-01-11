@@ -5,27 +5,90 @@ export const BookmarkImportService = {
    * 获取所有原生浏览器书签并扁平化
    */
   async getBrowserBookmarks(): Promise<chrome.bookmarks.BookmarkTreeNode[]> {
-    return new Promise((resolve) => {
-      chrome.bookmarks.getTree((tree) => {
-        const flatBookmarks: chrome.bookmarks.BookmarkTreeNode[] = []
-        
-        // 递归遍历函数
-        const traverse = (nodes: chrome.bookmarks.BookmarkTreeNode[]) => {
-          for (const node of nodes) {
-            if (node.url) {
-              // 如果有 URL，说明是书签
-              flatBookmarks.push(node)
-            } else if (node.children) {
-              // 如果没有 URL 且有 children，说明是文件夹，继续遍历
-              traverse(node.children)
-            }
-          }
+    return new Promise((resolve, reject) => {
+      // Timeout safety (5s)
+      const timeoutId = setTimeout(() => {
+        reject(new Error("Timeout: Failed to load bookmarks. Please try again."))
+      }, 5000)
+
+      try {
+        if (typeof chrome === "undefined" || !chrome.bookmarks) {
+          clearTimeout(timeoutId)
+          reject(new Error("Bookmarks API unavailable"))
+          return
         }
 
-        traverse(tree)
-        resolve(flatBookmarks)
-      })
+        chrome.bookmarks.getTree((tree) => {
+          clearTimeout(timeoutId)
+
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message))
+            return
+          }
+
+          if (!tree || !Array.isArray(tree)) {
+            resolve([])
+            return
+          }
+
+          const flatBookmarks: chrome.bookmarks.BookmarkTreeNode[] = []
+
+          // 递归遍历函数
+          const traverse = (nodes: chrome.bookmarks.BookmarkTreeNode[]) => {
+            if (!nodes) return
+            for (const node of nodes) {
+              if (node.url) {
+                flatBookmarks.push(node)
+              } else if (node.children) {
+                traverse(node.children)
+              }
+            }
+          }
+
+          traverse(tree)
+          resolve(flatBookmarks)
+        })
+      } catch (e: any) {
+        clearTimeout(timeoutId)
+        reject(e)
+      }
     })
+  },
+
+  /**
+   * 解析 HTML 书签文件内容
+   * 支持 Netscape Bookmark File Format (Chrome, Edge, Firefox 导出格式)
+   */
+  async parseHtmlBookmarks(htmlContent: string): Promise<Omit<BookmarkItem, "id" | "timestamp">[]> {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(htmlContent, "text/html")
+    const links = doc.getElementsByTagName("a")
+    const bookmarks: Omit<BookmarkItem, "id" | "timestamp">[] = []
+
+    for (let i = 0; i < links.length; i++) {
+      const link = links[i]
+      const url = link.getAttribute("href")
+      const title = link.textContent || "Untitled"
+
+      // 获取添加时间 (可选)
+      // const addDate = link.getAttribute("add_date")
+
+      // 尝试从文件夹结构获取标签 (尚未实现完全递归，暂取父级文本)
+      // 实际书签文件中，标签通常由文件夹层级决定
+      // 这里简化处理，后续可以优化
+
+      if (url && (url.startsWith("http://") || url.startsWith("https://"))) {
+        bookmarks.push({
+          url: url,
+          title: title,
+          description: "",
+          content_summary: "",
+          tags: [],
+          status: "pending"
+        })
+      }
+    }
+    return bookmarks
   },
 
   /**
@@ -44,25 +107,21 @@ export const BookmarkImportService = {
 
   /**
    * 检查 URL 是否可访问 (Ping)
-   * 只要服务器有响应（包括 403, 401, 500），都视为"链接存在"
-   * 只有网络错误（DNS, Timeout, Connection Refused）视为"死链"
    */
   async checkUrlAccessibility(url: string): Promise<boolean> {
     try {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 8000) // 8秒超时
 
-      // mode: 'no-cors' 允许我们要么得到 opaque response (成功/4xx/5xx)，要么抛出网络错误
-      await fetch(url, { 
-          method: "HEAD", 
-          mode: "no-cors", 
-          signal: controller.signal 
+      await fetch(url, {
+        method: "HEAD",
+        mode: "no-cors",
+        signal: controller.signal
       })
-      
+
       clearTimeout(timeoutId)
       return true
     } catch (error) {
-      // 网络不通
       return false
     }
   }

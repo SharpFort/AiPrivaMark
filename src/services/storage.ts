@@ -31,29 +31,29 @@ export const StorageService = {
    */
   async addBookmark(item: Omit<BookmarkItem, "id" | "timestamp">): Promise<BookmarkItem> {
     const bookmarks = await this.getBookmarks()
-    
+
     // 去重检查
     const existing = bookmarks.find(b => b.url === item.url)
     if (existing) {
-        // 也可以选择更新现有书签，这里为了简单直接抛出
-        throw new Error("Bookmark already exists!")
+      // 也可以选择更新现有书签，这里为了简单直接抛出
+      throw new Error("Bookmark already exists!")
     }
-    
+
     // 生成 ID
     const id = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString()
-    
+
     const newBookmark: BookmarkItem = {
       ...item,
       id,
       timestamp: Date.now(),
       tags: item.tags || [],
       content_summary: item.content_summary || "",
-      status: item.status || "pending" 
+      status: item.status || "pending"
     }
 
     const updatedBookmarks = [newBookmark, ...bookmarks]
     await storage.set(BOOKMARKS_KEY, updatedBookmarks)
-    
+
     return newBookmark
   },
 
@@ -63,30 +63,30 @@ export const StorageService = {
   async addBookmarksBatch(items: Omit<BookmarkItem, "id" | "timestamp">[]): Promise<number> {
     const currentBookmarks = await this.getBookmarks()
     const newBookmarks: BookmarkItem[] = []
-    
+
     // 简单的去重检查 Set (基于 URL)
     const existingUrls = new Set(currentBookmarks.map(b => b.url))
     let addedCount = 0
 
     for (const item of items) {
-        if (!existingUrls.has(item.url)) {
-            newBookmarks.push({
-                ...item,
-                id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9),
-                timestamp: Date.now(),
-                tags: item.tags || [],
-                content_summary: item.content_summary || "",
-                status: item.status || "pending"
-            })
-            addedCount++
-            // 更新 Set 防止 batch 内部重复
-            existingUrls.add(item.url)
-        }
+      if (!existingUrls.has(item.url)) {
+        newBookmarks.push({
+          ...item,
+          id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9),
+          timestamp: Date.now(),
+          tags: item.tags || [],
+          content_summary: item.content_summary || "",
+          status: item.status || "pending"
+        })
+        addedCount++
+        // 更新 Set 防止 batch 内部重复
+        existingUrls.add(item.url)
+      }
     }
 
     if (addedCount > 0) {
-        const updatedBookmarks = [...newBookmarks, ...currentBookmarks]
-        await storage.set(BOOKMARKS_KEY, updatedBookmarks)
+      const updatedBookmarks = [...newBookmarks, ...currentBookmarks]
+      await storage.set(BOOKMARKS_KEY, updatedBookmarks)
     }
 
     return addedCount
@@ -98,7 +98,7 @@ export const StorageService = {
   async updateBookmark(id: string, updates: Partial<BookmarkItem>): Promise<void> {
     const bookmarks = await this.getBookmarks()
     const index = bookmarks.findIndex((b) => b.id === id)
-    
+
     if (index !== -1) {
       bookmarks[index] = { ...bookmarks[index], ...updates }
       await storage.set(BOOKMARKS_KEY, bookmarks)
@@ -119,5 +119,12 @@ export const StorageService = {
    */
   async clearAll(): Promise<void> {
     await storage.remove(BOOKMARKS_KEY)
+  },
+
+  /**
+   * 覆盖所有书签 (用于全量导入)
+   */
+  async overrideAllBookmarks(bookmarks: BookmarkItem[]): Promise<void> {
+    await storage.set(BOOKMARKS_KEY, bookmarks)
   }
 }

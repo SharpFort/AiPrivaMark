@@ -2,8 +2,9 @@ import { Storage } from "@plasmohq/storage"
 import { ProcessingQueue } from "~services/queue"
 import { StorageService } from "~services/storage"
 import { DEFAULT_CONFIG, type AppConfig } from "~types/config"
+import { buildAIConfig } from "~utils/config-utils"
 
-export {} // 确保是模块
+export { } // 确保是模块
 
 let queue: ProcessingQueue | null = null
 const storage = new Storage({ area: "local" })
@@ -22,15 +23,22 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     if (info.menuItemId === "save-to-priva-mark") {
         const url = info.pageUrl
         const title = tab?.title || "Unknown Page"
-        
+
         // 1. 初始化 Queue (如果需要)
-        const config = await storage.get<AppConfig>("app-config") || DEFAULT_CONFIG
+        const rawConfig = await storage.get<AppConfig>("app-config") || DEFAULT_CONFIG
+
+        // Build AI config using helper (auto-detects configured provider)
+        const config = buildAIConfig(rawConfig)
+        if (!config) {
+            throw new Error("No API key configured")
+        }
+
         if (!queue) {
-             queue = new ProcessingQueue(config, (status) => {
-                chrome.runtime.sendMessage({ type: "QUEUE_PROGRESS", status }).catch(() => {})
+            queue = new ProcessingQueue(config, (status) => {
+                chrome.runtime.sendMessage({ type: "QUEUE_PROGRESS", status }).catch(() => { })
             })
         }
-        
+
         try {
             // 2. 添加到 Storage (Pending)
             // addBookmark 内部有去重逻辑
@@ -42,14 +50,14 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
                 tags: [],
                 status: "pending"
             })
-            
+
             // 3. 加入队列
             queue.addItems([newBookmark.id])
-            queue.start(2)
-            
+            queue.start(1) // Sequential processing - one at a time
+
             // 保活
             chrome.alarms.create("keep-alive", { periodInMinutes: 0.5 })
-            
+
             // 4. 通知用户
             chrome.notifications.create({
                 type: "basic",
@@ -57,7 +65,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
                 title: "AI Priva Mark",
                 message: "Page saved! Analyzing in background..."
             })
-            
+
         } catch (e: any) {
             console.warn("Save failed:", e)
             chrome.notifications.create({
@@ -75,26 +83,32 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // 异步处理函数需要返回 true
     handleMessage(msg, sendResponse)
-    return true 
+    return true
 })
 
 async function handleMessage(msg: any, sendResponse: (response?: any) => void) {
     if (msg.type === "START_BATCH") {
-        const config = await storage.get<AppConfig>("app-config") || DEFAULT_CONFIG
-        
-        if (!queue) {
-            queue = new ProcessingQueue(config, (status) => {
-                chrome.runtime.sendMessage({
-                    type: "QUEUE_PROGRESS",
-                    status
-                }).catch(() => {})
-            })
+        const rawConfig = await storage.get<AppConfig>("app-config") || DEFAULT_CONFIG
+
+        // Build AI config using helper (auto-detects configured provider)
+        const config = buildAIConfig(rawConfig)
+        if (!config) {
+            sendResponse({ success: false, error: "No API key configured" })
+            return
         }
-        
+
+        // Always recreate queue with fresh config to ensure latest API key is used
+        queue = new ProcessingQueue(config, (status) => {
+            chrome.runtime.sendMessage({
+                type: "QUEUE_PROGRESS",
+                status
+            }).catch(() => { })
+        })
+
         queue.addItems(msg.ids)
-        queue.start(2)
-        
-        chrome.alarms.create("keep-alive", { periodInMinutes: 0.5 }) 
+        queue.start(1) // Sequential processing - one at a time
+
+        chrome.alarms.create("keep-alive", { periodInMinutes: 0.5 })
         sendResponse({ success: true })
     }
 

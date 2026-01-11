@@ -45,11 +45,17 @@ export const AIService = {
    */
   async generateSummaryAndTags(content: string, config: AppConfig): Promise<AIAnalysisResult> {
     const { apiKey, baseUrl, model } = config
-    
+
     const truncatedContent = content.slice(0, 15000)
 
-    const userInstruction = config.customPrompt?.trim() || "请根据用户提供的网页文本内容，生成一份简短的中文摘要（100字以内），并提取5-8个关键标签。"
-    
+    // 使用 promptSettings（优先）或 customPrompt（向后兼容）
+    const promptSettings = config.promptSettings
+    const summaryMaxLength = promptSettings?.summaryMaxLength || 100
+    const tagCount = promptSettings?.tagCount || 8
+    const userInstruction = promptSettings?.systemPrompt?.trim()
+      || config.customPrompt?.trim()
+      || `请根据用户提供的网页文本内容，生成一份简短的中文摘要（${summaryMaxLength}字以内），并提取${tagCount}个关键标签。`
+
     const systemPrompt = `你是一个专业的网页内容整理助手。
 ${userInstruction}
 请严格按照以下 JSON 格式返回结果，不要包含 markdown 标记或其他多余内容：
@@ -74,7 +80,7 @@ ${userInstruction}
             { role: "system", content: systemPrompt },
             { role: "user", content: truncatedContent }
           ],
-          temperature: 0.3 
+          temperature: 0.3
         })
       })
 
@@ -114,11 +120,11 @@ ${userInstruction}
     let cleaned = str.replace(/```json/g, "").replace(/```/g, "")
     const firstBrace = cleaned.indexOf("{")
     const lastBrace = cleaned.lastIndexOf("}")
-    
+
     if (firstBrace !== -1 && lastBrace !== -1) {
       cleaned = cleaned.substring(firstBrace, lastBrace + 1)
     }
-    
+
     return cleaned.trim()
   }
 }

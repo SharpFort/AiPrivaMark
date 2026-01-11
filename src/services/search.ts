@@ -1,8 +1,8 @@
-import Fuse from "fuse.js"
+import Fuse, { type IFuseOptions } from "fuse.js"
 import type { BookmarkItem } from "~types/bookmark"
 
 // Fuse.js 搜索配置
-const fuseOptions: Fuse.IFuseOptions<BookmarkItem> = {
+const fuseOptions: IFuseOptions<BookmarkItem> = {
   includeScore: true,
   threshold: 0.4, // 0.0 是完全匹配，1.0 是匹配所有。0.4 是一个比较均衡的模糊度
   keys: [
@@ -27,7 +27,7 @@ export const SearchService = {
 
     const fuse = new Fuse(bookmarks, fuseOptions)
     const results = fuse.search(query)
-    
+
     // Fuse 返回的是 { item, score } 结构，我们需要还原回 BookmarkItem 数组
     return results.map((result) => result.item)
   }
