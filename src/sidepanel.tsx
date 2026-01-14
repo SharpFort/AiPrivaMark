@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useStorage } from "@plasmohq/storage/hook"
 import { AIService } from "~services/ai"
 import type { QueueStatus } from "~services/queue"
@@ -101,11 +101,26 @@ function SidePanel() {
     chrome.runtime.sendMessage({ type: "STOP_BATCH" })
   }
 
+  // 用于取消请求
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    return () => {
+      // 组件卸载时取消正在进行的请求
+      abortControllerRef.current?.abort()
+    }
+  }, [])
+
   // 核心保存逻辑 (单页 - 仍然在 SidePanel 直接处理，也可以迁移但保持现状更灵活)
   const handleSaveCurrentPage = async () => {
     if (isLoading) return
     setIsLoading(true)
     setErrorMsg(null)
+
+    // 取消之前的请求（如果有）
+    abortControllerRef.current?.abort()
+    const controller = new AbortController()
+    abortControllerRef.current = controller
 
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
@@ -129,7 +144,21 @@ function SidePanel() {
         throw new Error(t("apiKeyNotFound"))
       }
 
-      const aiResult = await AIService.generateSummaryAndTags(contentData.content, aiConfig)
+      // 构造包含元数据的丰富内容上下文
+      const richContent = `Title: ${contentData.title || ''}
+URL: ${contentData.url || ''}
+Description: ${contentData.metadata?.description || ''}
+Keywords: ${contentData.metadata?.keywords || ''}
+Author: ${contentData.metadata?.author || ''}
+
+Content:
+${contentData.content || ''}`
+
+      const aiResult = await AIService.generateSummaryAndTags(
+        richContent,
+        aiConfig,
+        controller.signal
+      )
 
       await StorageService.addBookmark({
         url: contentData.url,
@@ -144,10 +173,15 @@ function SidePanel() {
       setSearchQuery("")
 
     } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('Save cancelled')
+        return
+      }
       console.error("Save failed:", err)
       setErrorMsg(err.message || t("unknownErrorOccurred"))
     } finally {
       setIsLoading(false)
+      abortControllerRef.current = null
     }
   }
 

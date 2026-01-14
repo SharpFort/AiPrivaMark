@@ -257,13 +257,18 @@ export const en = {
     taskFinished: "Task Finished",
     processingInBackground: "Processing in background...",
     clickToRestore: "Click to restore details",
-    estRemaining: "Est. Remaining",
 
-    // Analysis
     analyzeLibrary: "Smart Analysis",
     analyzeDesc: "Use AI to auto-tag and summarize your bookmarks.",
     startAnalysis: "Start Analysis",
-    allAnalyzed: "All bookmarks have been analyzed."
+    allAnalyzed: "All bookmarks have been analyzed.",
+
+    // AI Prompts
+    process_prompt_system: "You are a professional web content organization assistant.",
+    process_prompt_user_intro: "Please complete the following two tasks based on the provided web content and return the result ONLY in JSON format:",
+    process_prompt_task_summary: "1. **Generate Summary**:\n   - Extract objective and concise points.\n   - Do not use subjective words like \"I\" or \"We\", only state core information.\n   - Keep it strictly under {{maxLength}} characters.",
+    process_prompt_task_tags: "2. **Extract Tags**:\n   - Extract {{count}} key tags.\n   - Tags should be concise and accurate (2-30 characters).",
+    process_prompt_output_format: "Please strictly follow this JSON format, do not include markdown markers or other extra content:\n{\n  \"summary\": \"Summary content...\",\n  \"tags\": [\"Tag1\", \"Tag2\", ...]\n}"
 }
 
 export type Translations = typeof en

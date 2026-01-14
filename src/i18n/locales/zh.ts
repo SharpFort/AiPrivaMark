@@ -258,11 +258,16 @@ export const zh: Translations = {
     taskFinished: "任务完成",
     processingInBackground: "后台处理中...",
     clickToRestore: "点击还原详情",
-    estRemaining: "预计剩余",
 
-    // Analysis
     analyzeLibrary: "智能分析",
     analyzeDesc: "使用 AI 自动为书签生成标签和摘要。",
     startAnalysis: "开始分析",
-    allAnalyzed: "所有书签已完成分析。"
+    allAnalyzed: "所有书签已完成分析。",
+
+    // AI Prompts
+    process_prompt_system: "你是一个专业的网页内容整理助手。",
+    process_prompt_user_intro: "请根据用户提供的网页文本内容，完成以下两个任务，并仅以 JSON 格式返回结果：",
+    process_prompt_task_summary: "1. **生成摘要**：\n   - 提取客观、简洁的要点。\n   - 不得出现\"我\"、\"我们\"等主观评价词，只陈述页面的核心信息。\n   - 精确控制在{{maxLength}}字以内。",
+    process_prompt_task_tags: "2. **提取标签**：\n   - 提取 {{count}} 个关键标签。\n   - 标签应简洁、准确（2-20个字符）。",
+    process_prompt_output_format: "请严格按照以下 JSON 格式返回结果，不要包含 markdown 标记或其他多余内容：\n{\n  \"summary\": \"摘要内容...\",\n  \"tags\": [\"标签1\", \"标签2\", ...]\n}"
 }

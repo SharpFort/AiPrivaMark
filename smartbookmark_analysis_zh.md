@@ -1,6 +1,6 @@
 github# SmartBookmark 项目分析
 
-该文档对 `吴总 鹏坝项目过磅数据 请查收` 项目进行了详细分析，旨在为 `AiPrivaMark` 的开发提供参考。
+该文档对 `SmartBookmark` 项目进行了详细分析，旨在为 `AiPrivaMark` 的开发提供参考。
 
 ## 1. 文件功能分析
 
