@@ -248,7 +248,7 @@ function Options() {
 
         processor.addTasks(tasks)
 
-        const analysisExecutor: TaskExecutor = async (task) => {
+        const analysisExecutor: TaskExecutor = async (task, onProgress) => {
             const bookmark = task.data as BookmarkItem
             // 如果已有总结，跳过
             if (bookmark.content_summary) {
@@ -256,19 +256,69 @@ function Options() {
             }
 
             try {
-                // 1. 获取内容 (Fetch content)
-                let content = ""
+                // Step 1: Accessing link
+                onProgress(t("stepAccessing") || "Accessing link...")
+
+                // 使用 Background Tab打开并提取内容 (避免 CORS/403)
+                // 这需要 background.ts 或 content.ts 配合。
+                // 现有的 queue.ts 逻辑是在 background 跑的。
+                // 这里我们发送消息给 background 让它帮忙提取，或者直接模拟 behavior。
+                // 为了复用，我们这里直接创建一个 tab 并等待。
+                // 但 Options 页面无法接收 content script 消息 (除非是 runtime 消息)。
+                // 简单点：创建 tab -> 等待加载 -> 发送消息 -> 关闭 tab。
+
+                const tab = await chrome.tabs.create({ url: bookmark.url, active: false })
+
+                // 等待页面加载
+                await new Promise<void>((resolve, reject) => {
+                    // 30s 超时
+                    const timeout = setTimeout(() => reject(new Error("Tab load timeout")), 30000)
+
+                    const listener = (tid: number, changeInfo: chrome.tabs.TabChangeInfo) => {
+                        if (tid === tab.id && changeInfo.status === 'complete') {
+                            chrome.tabs.onUpdated.removeListener(listener)
+                            clearTimeout(timeout)
+                            setTimeout(resolve, 2000) // 额外等待 JS 执行
+                        }
+                    }
+                    chrome.tabs.onUpdated.addListener(listener)
+                })
+
+                // Step 2: Extracting content
+                onProgress(t("stepExtracting") || "Extracting content...")
+
+                let contentData: any = null
                 try {
-                    const res = await fetch(bookmark.url)
-                    content = await res.text()
+                    // 发送消息给 tab 内容脚本
+                    // 注意：需要确保 content script 已注入。
+                    contentData = await chrome.tabs.sendMessage(tab.id!, { type: "EXTRACT_CONTENT" })
                 } catch (e) {
-                    return { success: false, msg: t("cannotReadPage") }
+                    console.warn("Direct extraction failed, trying update/inject?", e)
+                    // 如果页面刚加载 content script 可能没好，重试一次
+                    await new Promise(r => setTimeout(r, 1000))
+                    contentData = await chrome.tabs.sendMessage(tab.id!, { type: "EXTRACT_CONTENT" })
+                } finally {
+                    // 关闭 tab
+                    if (tab.id) await chrome.tabs.remove(tab.id)
                 }
 
-                // 2. 调用 AI
-                const result = await AIService.generateSummaryAndTags(content, aiConfig)
+                if (!contentData || (!contentData.content && !contentData.metadata)) {
+                    throw new Error(t("cannotReadPage") || "Cannot read page content")
+                }
 
-                // 3. 更新书签
+                // Step 3: Submitting to AI
+                onProgress(t("stepSubmittingAI") || "Submitting to AI...")
+
+                // 构造富文本上下文
+                const richContent = `Title: ${contentData.title}\nURL: ${contentData.url}\nDescription: ${contentData.metadata?.description || ""}\nKeywords: ${contentData.metadata?.keywords || ""}\nContent:\n${contentData.content}`
+
+                // Step 4: Analyzying
+                onProgress(t("stepAnalyzing") || "Analyzing...")
+                const result = await AIService.generateSummaryAndTags(richContent, aiConfig)
+
+                // Step 5: Saving
+                onProgress(t("stepSaving") || "Saving result...")
+
                 const updated = {
                     ...bookmark,
                     content_summary: result.summary,
@@ -277,13 +327,18 @@ function Options() {
                 }
 
                 await StorageService.updateBookmark(updated.id, updated)
+
+                // Step 6: Success
+                onProgress(t("stepSuccess") || "Success")
+
                 return { success: true }
             } catch (e: any) {
                 return { success: false, msg: e.message }
             }
         }
 
-        processor.start(analysisExecutor, 1) // AI 请求并发限制为 1 避免 Rate Limit
+        // 启动任务处理：并发 1，延迟 5-10秒
+        processor.start(analysisExecutor, 1, 5000, 10000)
     }
 
 

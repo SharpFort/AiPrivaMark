@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react"
 
+
 export interface TaskItem {
     id: string
     title: string
@@ -8,7 +9,10 @@ export interface TaskItem {
     msg?: string
 }
 
-export type TaskExecutor = (item: TaskItem) => Promise<{ success: boolean; msg?: string; skipped?: boolean }>
+export type TaskExecutor = (
+    item: TaskItem,
+    onProgress: (msg: string) => void
+) => Promise<{ success: boolean; msg?: string; skipped?: boolean }>
 
 export function useTaskProcessor() {
     const [tasks, setTasks] = useState<TaskItem[]>([])
@@ -31,6 +35,9 @@ export function useTaskProcessor() {
     const processingRef = useRef(false)
     const executorRef = useRef<TaskExecutor | null>(null)
     const activeTasksRef = useRef(0)
+
+    // 配置 Ref
+    const configRef = useRef({ concurrency: 1, minDelay: 1000, maxDelay: 1000 })
 
     // 添加任务
     const addTasks = useCallback((newTasks: TaskItem[]) => {
@@ -65,10 +72,17 @@ export function useTaskProcessor() {
     }
 
     // 开始处理
-    const start = useCallback(async (executor: TaskExecutor, concurrency = 3) => {
+    const start = useCallback(async (
+        executor: TaskExecutor,
+        concurrency = 1,
+        minDelay = 1000,
+        maxDelay = 1000
+    ) => {
         if (processingRef.current) return
 
         executorRef.current = executor
+        configRef.current = { concurrency, minDelay, maxDelay }
+
         processingRef.current = true
         setIsProcessing(true)
         setIsFinished(false)
@@ -95,10 +109,15 @@ export function useTaskProcessor() {
             if (!item) return
 
             activeTasksRef.current++
-            updateTaskStatus(item.id, "processing")
+            updateTaskStatus(item.id, "processing", "Start processing...")
 
             try {
-                const result = await executor(item)
+                // 定义进度回调
+                const onProgress = (msg: string) => {
+                    updateTaskStatus(item.id, "processing", msg)
+                }
+
+                const result = await executor(item, onProgress)
                 const status = result.skipped ? "skipped" : result.success ? "success" : "failed"
 
                 updateTaskStatus(item.id, status, result.msg)
@@ -115,6 +134,14 @@ export function useTaskProcessor() {
                 setStats(prev => ({ ...prev, processed: prev.processed + 1, failed: prev.failed + 1 }))
             } finally {
                 activeTasksRef.current--
+
+                // 添加随机延迟，避免 429
+                if (queueRef.current.length > 0 && processingRef.current) {
+                    const { minDelay, maxDelay } = configRef.current
+                    const delay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay
+                    await new Promise(r => setTimeout(r, delay))
+                }
+
                 processNext() // 递归处理下一个
             }
         }

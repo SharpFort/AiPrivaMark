@@ -259,6 +259,14 @@ export const zh: Translations = {
     processingInBackground: "后台处理中...",
     clickToRestore: "点击还原详情",
 
+    // Status Steps
+    stepAccessing: "正在访问链接...",
+    stepExtracting: "提取正文内容...",
+    stepSubmittingAI: "提交AI分析...",
+    stepAnalyzing: "AI思考中...",
+    stepSaving: "保存结果...",
+    stepSuccess: "完成",
+
     analyzeLibrary: "智能分析",
     analyzeDesc: "使用 AI 自动为书签生成标签和摘要。",
     startAnalysis: "开始分析",

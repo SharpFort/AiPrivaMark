@@ -258,6 +258,14 @@ export const en = {
     processingInBackground: "Processing in background...",
     clickToRestore: "Click to restore details",
 
+    // Status Steps
+    stepAccessing: "Accessing link...",
+    stepExtracting: "Extracting content...",
+    stepSubmittingAI: "Submitting to AI...",
+    stepAnalyzing: "Analyzing...",
+    stepSaving: "Saving result...",
+    stepSuccess: "Success",
+
     analyzeLibrary: "Smart Analysis",
     analyzeDesc: "Use AI to auto-tag and summarize your bookmarks.",
     startAnalysis: "Start Analysis",

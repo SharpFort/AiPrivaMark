@@ -27,7 +27,7 @@ export class ProcessingQueue {
 
   // 新增：获取当前状态
   getStatus() {
-      return { ...this.status }
+    return { ...this.status }
   }
 
   addItems(ids: string[]) {
@@ -52,9 +52,15 @@ export class ProcessingQueue {
 
     while (this.queue.length > 0 && !this.shouldStop) {
       const batchIds = this.queue.splice(0, concurrency)
-      
+
       const promises = batchIds.map(id => this.processItem(id))
       await Promise.all(promises)
+
+      // 添加随机延迟 (5-10s) 避免 429
+      if (this.queue.length > 0 && !this.shouldStop) {
+        const delay = Math.floor(Math.random() * (10000 - 5000 + 1)) + 5000
+        await new Promise(r => setTimeout(r, delay))
+      }
     }
 
     this.status.isProcessing = false
@@ -78,7 +84,7 @@ export class ProcessingQueue {
 
       // 2. 创建后台 Tab 并提取内容
       const content = await this.extractContentInBg(bookmark.url)
-      
+
       // 3. AI 分析
       const aiResult = await AIService.generateSummaryAndTags(content.content, this.config)
 
@@ -93,9 +99,9 @@ export class ProcessingQueue {
       this.status.success++
     } catch (error: any) {
       console.error(`Failed to process ${id}:`, error)
-      await StorageService.updateBookmark(id, { 
-          status: "error", 
-          errorMessage: error.message 
+      await StorageService.updateBookmark(id, {
+        status: "error",
+        errorMessage: error.message
       })
       this.status.failed++
     } finally {
@@ -107,42 +113,42 @@ export class ProcessingQueue {
   private async extractContentInBg(url: string): Promise<ExtractContentResponse> {
     // 创建不激活的标签页
     const tab = await chrome.tabs.create({ url, active: false })
-    
+
     // 超时 Promise
-    const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error("Timeout waiting for tab load")), 30000)
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Timeout waiting for tab load")), 30000)
     )
 
     // 内容获取 Promise
     const extractPromise = async (): Promise<ExtractContentResponse> => {
-        // 等待加载完成
-        await new Promise<void>((resolve) => {
-            const listener = (tid: number, changeInfo: chrome.tabs.TabChangeInfo) => {
-                if (tid === tab.id && changeInfo.status === 'complete') {
-                    chrome.tabs.onUpdated.removeListener(listener)
-                    setTimeout(resolve, 1500)
-                }
-            }
-            chrome.tabs.onUpdated.addListener(listener)
-        })
-
-        // 发送消息
-        try {
-            // @ts-ignore
-            const response = await chrome.tabs.sendMessage(tab.id!, { type: MESSAGES.EXTRACT_CONTENT })
-            return response
-        } catch (e) {
-             await new Promise(r => setTimeout(r, 1000))
-             // @ts-ignore
-             return await chrome.tabs.sendMessage(tab.id!, { type: MESSAGES.EXTRACT_CONTENT })
+      // 等待加载完成
+      await new Promise<void>((resolve) => {
+        const listener = (tid: number, changeInfo: chrome.tabs.TabChangeInfo) => {
+          if (tid === tab.id && changeInfo.status === 'complete') {
+            chrome.tabs.onUpdated.removeListener(listener)
+            setTimeout(resolve, 1500)
+          }
         }
+        chrome.tabs.onUpdated.addListener(listener)
+      })
+
+      // 发送消息
+      try {
+        // @ts-ignore
+        const response = await chrome.tabs.sendMessage(tab.id!, { type: MESSAGES.EXTRACT_CONTENT })
+        return response
+      } catch (e) {
+        await new Promise(r => setTimeout(r, 1000))
+        // @ts-ignore
+        return await chrome.tabs.sendMessage(tab.id!, { type: MESSAGES.EXTRACT_CONTENT })
+      }
     }
 
     try {
-        const result = await Promise.race([extractPromise(), timeoutPromise])
-        return result
+      const result = await Promise.race([extractPromise(), timeoutPromise])
+      return result
     } finally {
-        if (tab.id) await chrome.tabs.remove(tab.id)
+      if (tab.id) await chrome.tabs.remove(tab.id)
     }
   }
 }

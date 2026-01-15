@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react"
 import { useI18n } from "~i18n/hook"
 import type { TaskItem } from "../hooks/use-task-processor"
 
@@ -30,20 +31,46 @@ export function TaskProcessModal({
 }: TaskProcessModalProps) {
     const { t } = useI18n()
 
-    // 计算时间
-    const now = stats.endTime || Date.now()
-    const elapsedTime = Math.floor((now - stats.startTime) / 1000)
+    const [elapsedTime, setElapsedTime] = useState(0)
+    const [estRemaining, setEstRemaining] = useState(0)
+
+    useEffect(() => {
+        let interval: NodeJS.Timeout
+
+        if (isProcessing && stats.startTime > 0) {
+            interval = setInterval(() => {
+                const now = Date.now()
+                const elapsed = now - stats.startTime
+                setElapsedTime(Math.floor(elapsed / 1000))
+
+                // 估算剩余时间
+                if (stats.processed > 0 && stats.total > stats.processed) {
+                    const avgTimePerItem = elapsed / stats.processed
+                    const remainingItems = stats.total - stats.processed
+                    setEstRemaining(Math.floor((avgTimePerItem * remainingItems) / 1000))
+                }
+            }, 1000)
+        } else if (!isProcessing && stats.startTime === 0) {
+            setElapsedTime(0)
+            setEstRemaining(0)
+        }
+
+        return () => clearInterval(interval)
+    }, [isProcessing, stats.processed, stats.startTime, stats.total])
+
 
     const formatTime = (seconds: number) => {
-        const m = Math.floor(seconds / 60)
+        const h = Math.floor(seconds / 3600)
+        const m = Math.floor((seconds % 3600) / 60)
         const s = seconds % 60
+        if (h > 0) return `${h}h ${m}m ${s}s`
         return `${m}m ${s}s`
     }
 
-    // 估算剩余时间
-    const itemsPerSec = stats.processed / (elapsedTime || 1)
-    const remainingItems = stats.total - stats.processed
-    const remainingTime = itemsPerSec > 0 ? Math.floor(remainingItems / itemsPerSec) : 0
+    // ...
+
+    // (Inside list render)
+
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in duration-200">
@@ -80,7 +107,7 @@ export function TaskProcessModal({
                     </div>
                     <div className="bg-gray-50 p-4 rounded-lg text-center">
                         <div className="text-2xl font-bold text-gray-600">
-                            {isFinished ? t("finished") : `~ ${formatTime(remainingTime)}`}
+                            {isFinished ? t("finished") : `~ ${formatTime(estRemaining)}`}
                         </div>
                         <div className="text-xs text-gray-500 uppercase tracking-wider">{t("estRemaining") || "预计剩余"}</div>
                     </div>
@@ -123,7 +150,7 @@ export function TaskProcessModal({
                                     {item.status === "processing" && (
                                         <div className="flex items-center justify-end gap-1 text-blue-500">
                                             <span className="animate-spin text-xs">⟳</span>
-                                            <span className="text-xs font-medium">{t("processing") || "处理中"}</span>
+                                            <span className="text-xs font-medium">{item.msg || t("processing")}</span>
                                         </div>
                                     )}
                                     {item.status === "success" && (
